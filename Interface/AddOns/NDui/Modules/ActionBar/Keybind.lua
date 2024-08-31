@@ -8,15 +8,19 @@ local InCombatLockdown = InCombatLockdown
 local GetSpellBookItemName = C_SpellBook and C_SpellBook.GetSpellBookItemName or GetSpellBookItemName
 local GetMacroInfo = GetMacroInfo
 local IsAltKeyDown, IsControlKeyDown, IsShiftKeyDown = IsAltKeyDown, IsControlKeyDown, IsShiftKeyDown
-local GetBindingKey, GetBindingName, SetBinding, SaveBindings, LoadBindings = GetBindingKey, GetBindingName, SetBinding, SaveBindings, LoadBindings
+local GetBindingKey, SetBinding, SaveBindings, LoadBindings = GetBindingKey, SetBinding, SaveBindings, LoadBindings
 local MAX_ACCOUNT_MACROS = MAX_ACCOUNT_MACROS
-local NOT_BOUND, PRESS_KEY_TO_BIND, QUICK_KEYBIND_DESCRIPTION = NOT_BOUND, PRESS_KEY_TO_BIND, QUICK_KEYBIND_DESCRIPTION
+local NOT_BOUND = NOT_BOUND
 
 -- Button types
 local function hookActionButton(self)
-	local pet = self.commandName and strfind(self.commandName, "^BONUSACTION") and "PET"
-	local stance = self.commandName and strfind(self.commandName, "^SHAPESHIFT") and "STANCE"
-	Bar:Bind_Update(self, pet or stance or nil)
+	Bar:Bind_Update(self)
+end
+local function hookStanceButton(self)
+	Bar:Bind_Update(self, "STANCE")
+end
+local function hookPetButton(self)
+	Bar:Bind_Update(self, "PET")
 end
 local function hookMacroButton(self)
 	Bar:Bind_Update(self, "MACRO")
@@ -26,8 +30,18 @@ local function hookSpellButton(self)
 end
 
 function Bar:Bind_RegisterButton(button)
-	if button.IsProtected and button.IsObjectType and button:IsObjectType("CheckButton") and button:IsProtected() then
-		button:HookScript("OnEnter", hookActionButton)
+	local stance = StanceButton1:GetScript("OnClick")
+	local pet = PetActionButton1:GetScript("OnClick")
+
+	if button.IsProtected and button.IsObjectType and button.GetScript and button:IsObjectType("CheckButton") and button:IsProtected() then
+		local script = button:GetScript("OnClick")
+		if script == stance then
+			button:HookScript("OnEnter", hookStanceButton)
+		elseif script == pet then
+			button:HookScript("OnEnter", hookPetButton)
+		else
+			button:HookScript("OnEnter", hookActionButton)
+		end
 	end
 end
 
@@ -65,11 +79,11 @@ function Bar:Bind_Create()
 	frame:SetScript("OnEnter", function()
 		GameTooltip:SetOwner(frame, "ANCHOR_NONE")
 		GameTooltip:SetPoint("BOTTOM", frame, "TOP", 0, 2)
-		GameTooltip:AddLine(frame.tipName or frame.name, .6,.8,1)
+		GameTooltip:AddLine(frame.name, .6,.8,1)
 
 		if #frame.bindings == 0 then
 			GameTooltip:AddLine(NOT_BOUND, 1,0,0)
-			GameTooltip:AddLine(PRESS_KEY_TO_BIND)
+			GameTooltip:AddLine(L["PressToBind"])
 		else
 			GameTooltip:AddDoubleLine(L["KeyIndex"], L["KeyBinding"], .6,.6,.6, .6,.6,.6)
 			for i = 1, #frame.bindings do
@@ -134,7 +148,6 @@ function Bar:Bind_Update(button, spellmacro)
 	elseif spellmacro == "STANCE" or spellmacro == "PET" then
 		frame.name = button:GetName()
 		if not frame.name then return end
-		frame.tipName = button.commandName and GetBindingName(button.commandName)
 
 		frame.id = tonumber(button:GetID())
 		if not frame.id or frame.id < 1 or frame.id > (spellmacro == "STANCE" and 10 or 12) then
@@ -146,7 +159,6 @@ function Bar:Bind_Update(button, spellmacro)
 	else
 		frame.name = button:GetName()
 		if not frame.name then return end
-		frame.tipName = button.commandName and GetBindingName(button.commandName)
 
 		frame.action = tonumber(button.action)
 		if button.keyBoundTarget then
@@ -195,7 +207,7 @@ function Bar:Bind_Listener(key)
 				SetBinding(frame.bindings[i])
 			end
 		end
-		print(format(L["Clear binds"], frame.tipName or frame.name))
+		print(format(L["Clear binds"], frame.name))
 
 		Bar:Bind_Update(frame.button, frame.spellmacro)
 		return
@@ -216,9 +228,10 @@ function Bar:Bind_Listener(key)
 	else
 		SetBinding(alt..ctrl..shift..key, frame.spellmacro.." "..frame.name)
 	end
-	print((frame.tipName or frame.name).." |cff00ff00"..L["KeyBoundTo"].."|r "..alt..ctrl..shift..key)
+	print(frame.name.." |cff00ff00"..L["KeyBoundTo"].."|r "..alt..ctrl..shift..key)
 
 	Bar:Bind_Update(frame.button, frame.spellmacro)
+	frame:GetScript("OnEnter")(self)
 end
 
 function Bar:Bind_HideFrame()
@@ -256,9 +269,9 @@ function Bar:Bind_CreateDialog()
 	frame:SetSize(320, 100)
 	frame:SetPoint("TOP", 0, -135)
 	B.SetBD(frame)
-	B.CreateFS(frame, 16, QUICK_KEYBIND_MODE, false, "TOP", 0, -10)
+	B.CreateFS(frame, 16, L["QuickKeybindMode"], false, "TOP", 0, -10)
 
-	local helpInfo = B.CreateHelpInfo(frame, "|n"..QUICK_KEYBIND_DESCRIPTION.."|n|n"..L["KeybindingTip"])
+	local helpInfo = B.CreateHelpInfo(frame, "|n"..L["QuickKeybindDescription"])
 	helpInfo:SetPoint("TOPRIGHT", 2, -2)
 
 	local text = B.CreateFS(frame, 14, CHARACTER_SPECIFIC_KEYBINDINGS, "system", "TOP", 0, -40)
